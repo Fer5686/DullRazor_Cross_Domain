@@ -1,0 +1,30 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+myenv/
+venv/
+ENV/
+
+# Datos pesados e imágenes de HAM10000 / ISIC
+Datasets/HAM10000/*
+
+# EXCEPCIONES: Rescatar las máscaras K-Means y los metadatos
+!Datasets/HAM10000/ISIC2018_Task3_Test_Masks_KMeans/
+!Datasets/HAM10000/ISIC2018_Task3_Test_Masks_KMeans/*.png
+!Datasets/HAM10000/*.csv
+
+# Modelos entrenados y pesos pesados
+trained_models/**/*.pth
+trained_models/**/*.pt
+trained_models/**/*.npy
+
+# Resultados y carpetas de verificación locales
+Datasets/HAM10000/PAPER_FIGURES_VERIFY/
+*.xlsx
+*.pdf
+
+# Configuraciones locales de Visual Studio
+.vs/
