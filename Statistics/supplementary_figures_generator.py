@@ -7,7 +7,8 @@ DESCRIPTION:
     Compiles all granular multiclass confusion matrices across all independent training 
     runs (N=5) and cross-domain evaluation scenarios into a single publication-ready 
     Supplementary PDF document following Elsevier guidelines. Each of the 200 matrices 
-    is rendered individually with its explicit descriptive caption.
+    is rendered individually with its explicit descriptive caption and optimized spacing,
+    retaining the normalization and styling standards from the core statistical module.
 =========================================================================================
 """
 
@@ -16,6 +17,9 @@ import sys
 import re
 import glob
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
 
 # ==============================================================================
 # 0. ROBUST PATH CONFIGURATION & MODULE RESOLUTION
@@ -37,7 +41,7 @@ DOCS_DIR = getattr(config_paths, "DOCS_DIR")
 
 # Import ReportLab
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak, KeepTogether
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
@@ -89,9 +93,72 @@ def extract_model_seed(eval_dir_path: str, model_folder_name: str) -> str:
     return "N/A"
 
 
-def locate_confusion_matrix_png(eval_dir_path: str):
+def get_predictions(probs_path: str) -> np.ndarray:
+    probs = np.load(probs_path)
+    if len(probs.shape) > 1 and probs.shape[1] > 1:
+        return np.argmax(probs, axis=1)
+    return (probs >= 0.5).astype(int)
+
+
+def generate_high_res_normalized_confusion_matrix(eval_dir_path: str) -> str:
+    """
+    Genera la matriz de confusión normalizada (Recall) manteniendo exactamente 
+    el diseño visual (mapa de calor en escala de azules, fuentes grandes, 
+    porcentajes normalizados y conteos absolutos combinados) y eliminando 
+    los bordes blancos sobrantes para inserción limpia en ReportLab.
+    """
     if not eval_dir_path or not os.path.exists(eval_dir_path):
         return None
+        
+    labels_path = os.path.join(eval_dir_path, "labels.npy")
+    probs_path = os.path.join(eval_dir_path, "probs.npy")
+    
+    if os.path.exists(labels_path) and os.path.exists(probs_path):
+        try:
+            y_true = np.load(labels_path)
+            if len(y_true.shape) > 1 and y_true.shape[1] > 1:
+                y_true = np.argmax(y_true, axis=1)
+            preds = get_predictions(probs_path)
+            
+            # Cálculo exacto de matrices normalizadas (Recall) y absolutas
+            cm_norm = confusion_matrix(y_true, preds, normalize='true')
+            cm_abs = confusion_matrix(y_true, preds)
+            class_labels = ["NV", "MEL", "BKL", "BCC", "AKIEC", "VASC", "DF"]
+            
+            fig, ax = plt.subplots(figsize=(6, 5))
+            fig.patch.set_facecolor('white')
+
+            im = ax.imshow(cm_norm, interpolation='nearest', cmap=plt.cm.Blues)
+            
+            ax.set_xticks(np.arange(len(class_labels)))
+            ax.set_yticks(np.arange(len(class_labels)))
+            # Fuentes grandes y legibles para las clases
+            ax.set_xticklabels(class_labels, rotation=45, ha="right", fontsize=12, fontweight='bold')
+            ax.set_yticklabels(class_labels, fontsize=12, fontweight='bold')
+            
+            ax.set_ylabel("True Pathology", fontweight='bold', fontsize=13)
+            ax.set_xlabel("Predicted Pathology", fontweight='bold', fontsize=13)
+
+            threshold = np.max(cm_norm) / 2.0
+            for i in range(len(class_labels)):
+                for j in range(len(class_labels)):
+                    val_pct = cm_norm[i, j]
+                    val_abs = cm_abs[i, j]
+                    txt = f"{val_pct:.1%}\n({int(val_abs)})"
+                    text_color = "white" if val_pct > threshold else "black"
+                    # Fuentes grandes para los valores internos de la matriz
+                    ax.text(j, i, txt, ha="center", va="center", color=text_color, fontsize=10, fontweight='bold')
+
+            # Eliminación estricta de márgenes blancos innecesarios
+            plt.tight_layout()
+            out_png_path = os.path.join(eval_dir_path, "confusion_matrix_test_norm_highres.png")
+            plt.savefig(out_png_path, dpi=300, bbox_inches='tight', pad_inches=0.02)
+            plt.close(fig)
+            return out_png_path
+        except Exception:
+            pass
+
+    # Fallback a búsqueda tradicional si no se pudo generar al vuelo
     for candidate in ("confusion_matrix_test.png", "matriz_confusion_test.png"):
         full_path = os.path.join(eval_dir_path, candidate)
         if os.path.exists(full_path):
@@ -100,7 +167,7 @@ def locate_confusion_matrix_png(eval_dir_path: str):
 
 
 # ==============================================================================
-# 2. PDF COMPILER USING REPORTLAB (INDIVIDUAL MATRICES LAYOUT)
+# 2. PDF COMPILER USING REPORTLAB (CONTROLLED LAYOUT & KEEP-TOGETHER)
 # ==============================================================================
 
 def compile_supplementary_pdf(base_folders: list, output_pdf_path: str, max_n: int = 5):
@@ -119,7 +186,7 @@ def compile_supplementary_pdf(base_folders: list, output_pdf_path: str, max_n: i
         'ArchHeading', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=12, leading=16, textColor=colors.HexColor("#1A365D"), spaceBefore=10, spaceAfter=6, keepWithNext=True
     )
     caption_style = ParagraphStyle(
-        'FigCaption', parent=styles['Normal'], fontName='Helvetica', fontSize=8.5, leading=11, alignment=1, spaceBefore=4, spaceAfter=12, keepWithNext=True
+        'FigCaption', parent=styles['Normal'], fontName='Helvetica', fontSize=8.5, leading=11, alignment=1, spaceBefore=4, spaceAfter=8, keepWithNext=True
     )
 
     story = []
@@ -128,7 +195,7 @@ def compile_supplementary_pdf(base_folders: list, output_pdf_path: str, max_n: i
     story.append(Paragraph("Supplementary Material: Granular Multiclass Confusion Matrices", title_style))
     story.append(Paragraph(
         "<b>Manuscript Title:</b> A statistical validation framework for evaluating artifact preprocessing impact in skin lesion classification.<br/>"
-        "<b>Content:</b> Complete set of individual multiclass confusion matrices across all independent training runs (N=5) and cross-domain evaluation scenarios.",
+        "<b>Content:</b> Complete set of individual multiclass normalized confusion matrices across all independent training runs (N=5) and cross-domain evaluation scenarios.",
         subtitle_style
     ))
     story.append(PageBreak())
@@ -174,10 +241,10 @@ def compile_supplementary_pdf(base_folders: list, output_pdf_path: str, max_n: i
                         seed_cp = extract_model_seed(sub_cp.iloc[0]['Ruta_Directorio'], modelo_cp)
                     f_nat_cp = sub_cp[sub_cp['Testeado_En'] == 'Con Pelos']
                     if not f_nat_cp.empty:
-                        path_native_cp = locate_confusion_matrix_png(f_nat_cp.iloc[0]['Ruta_Directorio'])
+                        path_native_cp = generate_high_res_normalized_confusion_matrix(f_nat_cp.iloc[0]['Ruta_Directorio'])
                     f_cro_sp = sub_cp[sub_cp['Testeado_En'] == 'Sin Pelos']
                     if not f_cro_sp.empty:
-                        path_cross_sp = locate_confusion_matrix_png(f_cro_sp.iloc[0]['Ruta_Directorio'])
+                        path_cross_sp = generate_high_res_normalized_confusion_matrix(f_cro_sp.iloc[0]['Ruta_Directorio'])
 
                 if modelo_sp:
                     sub_sp = df_test[df_test['Modelo'] == modelo_sp]
@@ -185,10 +252,10 @@ def compile_supplementary_pdf(base_folders: list, output_pdf_path: str, max_n: i
                         seed_sp = extract_model_seed(sub_sp.iloc[0]['Ruta_Directorio'], modelo_sp)
                     f_nat_sp = sub_sp[sub_sp['Testeado_En'] == 'Sin Pelos']
                     if not f_nat_sp.empty:
-                        path_native_sp = locate_confusion_matrix_png(f_nat_sp.iloc[0]['Ruta_Directorio'])
+                        path_native_sp = generate_high_res_normalized_confusion_matrix(f_nat_sp.iloc[0]['Ruta_Directorio'])
                     f_cro_cp = sub_sp[sub_sp['Testeado_En'] == 'Con Pelos']
                     if not f_cro_cp.empty:
-                        path_cross_cp = locate_confusion_matrix_png(f_cro_cp.iloc[0]['Ruta_Directorio'])
+                        path_cross_cp = generate_high_res_normalized_confusion_matrix(f_cro_cp.iloc[0]['Ruta_Directorio'])
 
                 scenarios = [
                     (path_native_cp, f"Run #{row_idx + 1} (Seed: {seed_cp}) — Trained: With Hair | Tested: With Hair (Native Raw)"),
@@ -199,12 +266,13 @@ def compile_supplementary_pdf(base_folders: list, output_pdf_path: str, max_n: i
 
                 for img_path, caption_text in scenarios:
                     if img_path and os.path.exists(img_path):
-                        # Tamaño amplio y cómodo para lectura individual
-                        img = RLImage(img_path, width=240, height=185)
-                        story.append(img)
-                        story.append(Paragraph(f"<b>Figure S{fig_counter}.</b> {caption_text} [{metric_label}, {arch}].", caption_style))
+                        # Dimensiones optimizadas para mantener proporción y permitir lectura perfecta
+                        img = RLImage(img_path, width=220, height=175)
+                        caption = Paragraph(f"<b>Figure S{fig_counter}.</b> {caption_text} [{metric_label}, {arch}].", caption_style)
+                        
+                        # Agrupación estricta para evitar que la imagen y su epígrafe se separen en páginas distintas
+                        story.append(KeepTogether([img, caption, Spacer(1, 6)]))
                         fig_counter += 1
-                        story.append(Spacer(1, 4))
 
             story.append(PageBreak())
 
