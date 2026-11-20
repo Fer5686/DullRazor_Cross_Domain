@@ -84,6 +84,8 @@ Install dependencies with:
 pip install -r requirements.txt
 ```
 
+> **Note on PyTorch/CUDA installation:** The original environment was built using Conda (`conda-forge`) to handle GPU/CUDA dependencies automatically (`conda install -c conda-forge pytorch-gpu torchvision`). If installing purely via `pip`, install a matched `torch`/`torchvision` pair for your CUDA version from [pytorch.org](https://pytorch.org/get-started/locally/) (e.g., `torch==2.7.1` with `torchvision==0.22.1`) before installing the remaining packages.
+
 ---
 
 ## 📝 License & Acknowledgments

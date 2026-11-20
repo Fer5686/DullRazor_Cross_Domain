@@ -47,11 +47,7 @@
     <Compile Include="Main_code\finetuning_training_alexnet.py" />
     <Compile Include="Main_code\main.py" />
     <Compile Include="Preprocessing\hair_removal_dullrazor.py" />
-    <Compile Include="Statistics\clean.py" />
     <Compile Include="Statistics\clean_data_extractor.py" />
-    <Compile Include="Statistics\comparador.py" />
-    <Compile Include="Statistics\package_for_zenodo.py" />
-    <Compile Include="Statistics\referencias.py" />
     <Compile Include="Statistics\paper_tables_and_matrices.py" />
     <Compile Include="Statistics\supplementary_figures_generator.py" />
     <Compile Include="Statistics\macro_architecture_comparison.py" />
