@@ -184,16 +184,17 @@ if __name__ == '__main__':
     experiment_queue = [
         
         # --- 1. ALEXNET ---
-        (train_alexnet_end_to_end, "AlexNet", SEED_A1, False), 
-        (train_alexnet_end_to_end, "AlexNet", SEED_A3, False), 
-        (train_alexnet_end_to_end, "AlexNet", SEED_A3, True),  
+        (train_alexnet_end_to_end, "AlexNet", SEED_A1, False),
+        (train_alexnet_end_to_end, "AlexNet", SEED_A1, True),
+        (train_alexnet_end_to_end, "AlexNet", SEED_A2, False),
+        (train_alexnet_end_to_end, "AlexNet", SEED_A2, True),
+        (train_alexnet_end_to_end, "AlexNet", SEED_A3, False),
+        (train_alexnet_end_to_end, "AlexNet", SEED_A3, True),
         (train_alexnet_end_to_end, "AlexNet", SEED_A4, False),
         (train_alexnet_end_to_end, "AlexNet", SEED_A4, True),
         (train_alexnet_end_to_end, "AlexNet", SEED_A5, False),
         (train_alexnet_end_to_end, "AlexNet", SEED_A5, True),
-        (train_alexnet_end_to_end, "AlexNet", SEED_A1, True),  
-        (train_alexnet_end_to_end, "AlexNet", SEED_A2, False), 
-        (train_alexnet_end_to_end, "AlexNet", SEED_A2, True),  
+          
 
         # --- 2. VGG-16 ---
         (train_vgg16_end_to_end, "VGG16", SEED_V1, False), 
@@ -209,15 +210,15 @@ if __name__ == '__main__':
 
         # --- 3. RESNET-50 ---
         (train_resnet50_end_to_end, "ResNet50", SEED_R1, False), 
-        (train_resnet50_end_to_end, "ResNet50", SEED_R1, True),  
-        (train_resnet50_end_to_end, "ResNet50", SEED_R5, True),
+        (train_resnet50_end_to_end, "ResNet50", SEED_R1, True),
         (train_resnet50_end_to_end, "ResNet50", SEED_R2, False), 
         (train_resnet50_end_to_end, "ResNet50", SEED_R2, True),  
         (train_resnet50_end_to_end, "ResNet50", SEED_R3, False), 
-        (train_resnet50_end_to_end, "ResNet50", SEED_R3, True),  
+        (train_resnet50_end_to_end, "ResNet50", SEED_R3, True),
         (train_resnet50_end_to_end, "ResNet50", SEED_R4, False),
         (train_resnet50_end_to_end, "ResNet50", SEED_R4, True),
         (train_resnet50_end_to_end, "ResNet50", SEED_R5, False),
+        (train_resnet50_end_to_end, "ResNet50", SEED_R5, True),
 
         # --- 4. SWIN TRANSFORMER ---
         (train_swin_end_to_end, "Swin", SEED_S1, False), 

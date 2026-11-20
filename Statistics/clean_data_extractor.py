@@ -1,11 +1,13 @@
 """
 =========================================================================================
-MODULE: Centralized Evaluation Data Extractor & Chronological Selector
+MODULE: Evaluation Data Extractor & Chronological Selector
         (statistics/clean_data_extractor.py)
 =========================================================================================
 DESCRIPTION:
-    Consolidates the extraction and chronological filtering engines (`estadistica9.py` 
-    and `estadistica10.py`) into a single unified module.
+    Discovers experiment run directories, infers training domain conditions and seeds,
+    extracts evaluation metrics from score_*.csv artifacts across validation and test
+    splits (native and cross-domain), deduplicates checkpoints, and selects chronological
+    model cohorts per architecture.
 =========================================================================================
 """
 
@@ -14,15 +16,6 @@ import glob
 import re
 import numpy as np
 import pandas as pd
-
-SEEDS_WITH_HAIR = {
-    '214631', '681147', '324235', '135790', '246801', '112233',
-    '123456', '654321', '987654', '443322', '998877', '666666'
-}
-SEEDS_WITHOUT_HAIR = {
-    '831824', '866271', '53668', '303030', '404040', '101010',
-    '202020', '825040'
-}
 
 
 def find_model_directories(base_paths_list: list) -> list:
@@ -39,6 +32,48 @@ def find_model_directories(base_paths_list: list) -> list:
                 dirs.remove(m)
 
     return sorted(list(set(discovered_folders)))
+
+
+def extract_seed(model_dir_path: str) -> str | None:
+    """Extrae la semilla (Seed) desde logs, archivos info/inicio o nombre de carpeta."""
+    patterns = [
+        re.compile(r'\bSeed\s*[:=]\s*(\d+)', re.IGNORECASE),
+        re.compile(r'Seed(\d+)', re.IGNORECASE),
+    ]
+
+    candidate_files = (
+        glob.glob(os.path.join(model_dir_path, "log_*.txt")) +
+        glob.glob(os.path.join(model_dir_path, "info_inicio*.txt")) +
+        glob.glob(os.path.join(model_dir_path, "info_start*.txt")) +
+        glob.glob(os.path.join(model_dir_path, "initial_info*.txt")) +
+        glob.glob(os.path.join(model_dir_path, "info_param*.txt")) +
+        glob.glob(os.path.join(model_dir_path, "param_info*.txt"))
+    )
+
+    for fpath in candidate_files:
+        fname = os.path.basename(fpath)
+        for pat in patterns:
+            m_name = pat.search(fname)
+            if m_name:
+                return m_name.group(1)
+
+        try:
+            with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+            for pat in patterns:
+                m_body = pat.search(content)
+                if m_body:
+                    return m_body.group(1)
+        except Exception:
+            pass
+
+    folder_name = os.path.basename(os.path.normpath(model_dir_path))
+    for pat in patterns:
+        m_folder = pat.search(folder_name)
+        if m_folder:
+            return m_folder.group(1)
+
+    return None
 
 
 def infer_training_condition(model_dir_path: str) -> str:
@@ -66,24 +101,6 @@ def infer_training_condition(model_dir_path: str) -> str:
         except Exception:
             pass
 
-    start_files = (
-        glob.glob(os.path.join(model_dir_path, "info_inicio*.txt")) +
-        glob.glob(os.path.join(model_dir_path, "info_start*.txt")) +
-        glob.glob(os.path.join(model_dir_path, "initial_info*.txt"))
-    )
-    for ini_file in start_files:
-        try:
-            with open(ini_file, 'r', encoding='utf-8') as f:
-                seed_match = re.search(r'Seed:\s*(\d+)', f.read())
-                if seed_match:
-                    seed_val = seed_match.group(1)
-                    if seed_val in SEEDS_WITH_HAIR:
-                        return 'Con Pelos'
-                    if seed_val in SEEDS_WITHOUT_HAIR:
-                        return 'Sin Pelos'
-        except Exception:
-            pass
-
     return 'Desconocido'
 
 
@@ -99,8 +116,6 @@ def simplify_architecture(path_or_name: str) -> str:
         return 'VGG-16'
     if 'alexnet' in n:
         return 'AlexNet'
-    if 'vim' in n or 'mamba' in n or 'vision' in n:
-        return 'Vision Mamba'
     return 'Otro'
 
 
@@ -142,6 +157,8 @@ def extract_raw_evaluation_data(base_paths: list, target_metric: str) -> pd.Data
         cond_train = infer_training_condition(model_path)
         if cond_train == 'Desconocido':
             continue
+
+        seed_val = extract_seed(model_path)
 
         for csv_path in glob.glob(os.path.join(model_path, "**", "score_*.csv"), recursive=True):
             eval_dir = os.path.dirname(csv_path)
@@ -199,6 +216,7 @@ def extract_raw_evaluation_data(base_paths: list, target_metric: str) -> pd.Data
                 records.append({
                     'Arquitectura': arch,
                     'Modelo': mod_name,
+                    'Semilla': seed_val,
                     'Entrenado_Con': cond_train,
                     'Testeado_En': cond_test,
                     'Fase': phase,
@@ -209,7 +227,7 @@ def extract_raw_evaluation_data(base_paths: list, target_metric: str) -> pd.Data
                 })
 
     expected_cols = [
-        'Arquitectura', 'Modelo', 'Entrenado_Con', 'Testeado_En',
+        'Arquitectura', 'Modelo', 'Semilla', 'Entrenado_Con', 'Testeado_En',
         'Fase', 'Es_Cruzado', 'Valor_Metrica', 'Ruta_Directorio'
     ]
     if not records:

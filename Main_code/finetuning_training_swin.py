@@ -14,7 +14,7 @@ DESCRIPTION:
        patching) in the custom wrapper to enable granular stage-level unfreezing.
     2. Three-Phase Progressive Unfreezing:
        - Phase 1 (Warmup Head): Frozen attention backbone; trains only the classifier 
-         head (Dropout p=0.3) for up to 150 epochs (LR = 1e-3).
+         head (Dropout p=0.0) for up to 150 epochs (LR = 1e-3).
        - Phase 2 (Stage 4 Unfreeze): Unfreezes Stage 4 (the deepest hierarchical 
          attention level) for up to 100 epochs (LR = 1e-4) to adapt high-level semantic 
          representations.
@@ -70,7 +70,7 @@ def train_swin_end_to_end(main_param):
     debug_mode = main_param.get("debug_mode", False)
     
     # Base parameters for Swin Transformer (Table 3)
-    dropout_rate = 0.3
+    dropout_rate = 0.0
     batch_size = 64
     
     # Define progressive unfreezing phases

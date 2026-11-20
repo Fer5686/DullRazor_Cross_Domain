@@ -288,24 +288,45 @@ def generate_combined_table_figure(datos_pob: dict, datos_mcnemar: dict, arq: st
 # ==============================================================================
 # 3. STATISTICAL FUNCTIONS: WELCH'S T-TEST, PAIRED T-TEST & MCNEMAR
 # ==============================================================================
-def calc_population_stats(a, b, paired: bool = True) -> tuple:
-    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
-    a, b = a[~np.isnan(a)], b[~np.isnan(b)]
-    if len(a) < 2 or len(b) < 2:
+def calc_population_stats(a, b, paired: bool = True, seeds_a=None, seeds_b=None) -> tuple:
+    a_arr = np.asarray(a, dtype=float)
+    b_arr = np.asarray(b, dtype=float)
+
+    if paired and seeds_a is not None and seeds_b is not None:
+        df_a = pd.DataFrame({"Semilla": seeds_a, "val_a": a_arr}).dropna(subset=["Semilla", "val_a"])
+        df_b = pd.DataFrame({"Semilla": seeds_b, "val_b": b_arr}).dropna(subset=["Semilla", "val_b"])
+        df_a["Semilla"] = df_a["Semilla"].astype(str).str.strip()
+        df_b["Semilla"] = df_b["Semilla"].astype(str).str.strip()
+
+        merged = pd.merge(df_a, df_b, on="Semilla", how="inner")
+        if len(merged) < 2:
+            return np.nan, np.nan
+
+        a_clean = merged["val_a"].to_numpy(dtype=float)
+        b_clean = merged["val_b"].to_numpy(dtype=float)
+        _, p = stats.ttest_rel(a_clean, b_clean)
+        pooled_std = np.sqrt((np.std(a_clean, ddof=1) ** 2 + np.std(b_clean, ddof=1) ** 2) / 2)
+        d = abs(np.mean(a_clean) - np.mean(b_clean)) / max(pooled_std, 1e-5)
+        return p, d
+
+    a_clean = a_arr[~np.isnan(a_arr)]
+    b_clean = b_arr[~np.isnan(b_arr)]
+    if len(a_clean) < 2 or len(b_clean) < 2:
         return np.nan, np.nan
-    
+
     if paired:
-        min_len = min(len(a), len(b))
-        _, p = stats.ttest_rel(a[:min_len], b[:min_len])
-        pooled_std = np.sqrt((np.std(a, ddof=1) ** 2 + np.std(b, ddof=1) ** 2) / 2)
+        min_len = min(len(a_clean), len(b_clean))
+        _, p = stats.ttest_rel(a_clean[:min_len], b_clean[:min_len])
+        pooled_std = np.sqrt((np.std(a_clean[:min_len], ddof=1) ** 2 + np.std(b_clean[:min_len], ddof=1) ** 2) / 2)
+        d = abs(np.mean(a_clean[:min_len]) - np.mean(b_clean[:min_len])) / max(pooled_std, 1e-5)
     else:
-        _, p = stats.ttest_ind(a, b, equal_var=False)
+        _, p = stats.ttest_ind(a_clean, b_clean, equal_var=False)
         pooled_std = np.sqrt(
-            ((len(a) - 1) * np.std(a, ddof=1) ** 2 + (len(b) - 1) * np.std(b, ddof=1) ** 2) /
-            (len(a) + len(b) - 2)
+            ((len(a_clean) - 1) * np.std(a_clean, ddof=1) ** 2 + (len(b_clean) - 1) * np.std(b_clean, ddof=1) ** 2) /
+            (len(a_clean) + len(b_clean) - 2)
         )
-        
-    d = abs(np.mean(a) - np.mean(b)) / max(pooled_std, 1e-5)
+        d = abs(np.mean(a_clean) - np.mean(b_clean)) / max(pooled_std, 1e-5)
+
     return p, d
 
 
@@ -594,17 +615,28 @@ def process_and_generate_complete_tables(base_folders: list, save_dir: str, max_
             df_test = df_arq[df_arq['Fase'] == 'TEST']
             df_val = df_arq[df_arq['Fase'] == 'VAL']
             
-            g1 = df_test[(df_test['Entrenado_Con'] == 'Con Pelos') & (df_test['Testeado_En'] == 'Con Pelos')]['Valor_Metrica'].dropna()
-            g2 = df_test[(df_test['Entrenado_Con'] == 'Con Pelos') & (df_test['Testeado_En'] == 'Sin Pelos')]['Valor_Metrica'].dropna()
-            g3 = df_test[(df_test['Entrenado_Con'] == 'Sin Pelos') & (df_test['Testeado_En'] == 'Con Pelos')]['Valor_Metrica'].dropna()
-            g4 = df_test[(df_test['Entrenado_Con'] == 'Sin Pelos') & (df_test['Testeado_En'] == 'Sin Pelos')]['Valor_Metrica'].dropna()
+            g1_df = df_test[(df_test['Entrenado_Con'] == 'Con Pelos') & (df_test['Testeado_En'] == 'Con Pelos')].dropna(subset=['Valor_Metrica'])
+            g2_df = df_test[(df_test['Entrenado_Con'] == 'Con Pelos') & (df_test['Testeado_En'] == 'Sin Pelos')].dropna(subset=['Valor_Metrica'])
+            g3_df = df_test[(df_test['Entrenado_Con'] == 'Sin Pelos') & (df_test['Testeado_En'] == 'Con Pelos')].dropna(subset=['Valor_Metrica'])
+            g4_df = df_test[(df_test['Entrenado_Con'] == 'Sin Pelos') & (df_test['Testeado_En'] == 'Sin Pelos')].dropna(subset=['Valor_Metrica'])
+
+            g1 = g1_df['Valor_Metrica']
+            g2 = g2_df['Valor_Metrica']
+            g3 = g3_df['Valor_Metrica']
+            g4 = g4_df['Valor_Metrica']
 
             if min(len(g1), len(g2), len(g3), len(g4)) == 0:
                 continue
-            
+
             p1, d1 = calc_population_stats(g1.values, g4.values, paired=False)
-            p2, d2 = calc_population_stats(g1.values, g2.values, paired=True)
-            p3, d3 = calc_population_stats(g3.values, g4.values, paired=True)
+            p2, d2 = calc_population_stats(
+                g1.values, g2.values, paired=True,
+                seeds_a=g1_df['Semilla'].values, seeds_b=g2_df['Semilla'].values
+            )
+            p3, d3 = calc_population_stats(
+                g3.values, g4.values, paired=True,
+                seeds_a=g3_df['Semilla'].values, seeds_b=g4_df['Semilla'].values
+            )
 
             datos_pob = {
                 'medias': {'cp_cp': g1.mean(), 'cp_sp': g2.mean(), 'sp_cp': g3.mean(), 'sp_sp': g4.mean()},

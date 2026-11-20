@@ -52,12 +52,6 @@ from models.swin import create_model as create_swin
 from models.vgg16 import create_model as create_vgg
 from models.alexnet import create_model as create_alexnet
 
-try:
-    from models.vision_mamba import create_model as create_vim
-except ImportError:
-    create_vim = None
-
-
 # ==============================================================================
 # AUXILIARY CLASSES & HELPER FUNCTIONS
 # ==============================================================================
@@ -239,10 +233,6 @@ def verify_native_model(folder_name: str, base_directory: str, tasks_to_run: lis
     elif 'alexnet' in folder_lower:
         model = create_alexnet().to(hardware_device)
         model_variant = 'alexnet'
-        data_param['size'] = 224
-    elif ('vim' in folder_lower or 'vision' in folder_lower) and create_vim is not None:
-        model = create_vim().to(hardware_device)
-        model_variant = 'visionmamba'
         data_param['size'] = 224
     else:
         print(f"❌ Unrecognized architecture in folder name: {folder_name}")

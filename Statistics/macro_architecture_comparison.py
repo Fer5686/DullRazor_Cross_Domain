@@ -5,7 +5,7 @@ MODULE: Cross-Architecture Macro Comparison & Baseline Benchmarking
 =========================================================================================
 DESCRIPTION:
     Evaluates the macro-level hierarchy across deep learning backbones (AlexNet, VGG-16, 
-    ResNet-50, Swin Transformer, ConvNeXt, Vision Mamba) under native conditions:
+    ResNet-50, Swin Transformer, ConvNeXt) under native conditions:
     - Native Raw Performance (Trained With Hair / Tested With Hair).
     - Native Clean Performance (Trained Without Hair / Tested Without Hair via DullRazor).
     
@@ -181,7 +181,7 @@ def export_macro_elsevier_table(df_results: pd.DataFrame, metric_name: str, save
 def generate_macro_analysis(base_folders: list, save_dir: str, max_n: int = 3, language: str = 'en'):
     architecture_order = [
         'AlexNet', 'VGG-16', 'ResNet-50', 
-        'Swin Transformer', 'Vision Mamba', 'ConvNeXt'
+        'Swin Transformer', 'ConvNeXt'
     ]
     metrics = ['f2_score', 'mel_f2']
 
